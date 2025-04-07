@@ -1,0 +1,15 @@
+# Node.js
+node_modules/
+package-lock.json
+
+# C++ binaries
+*.out
+*.exe
+/backend/algorithms/bfs
+
+# OS files
+.DS_Store
+"node_modules/" 
+"*.out" 
+"*.exe" 
+"*.exe" 
