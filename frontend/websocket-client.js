@@ -10,6 +10,15 @@ socket.onopen = () => {
 socket.onmessage = (event) => {
   const data = JSON.parse(event.data);
   console.log("Received:", data);
+}; 
+
+   if (data.type === 'visited') {
+    const offset = data.algo === 'dijkstra' ? 15:0;
+    visualizeVisit(data.x + offset, data.y);
+  }
+   if (data.type === 'done') {
+    console.log(`✅ ${data.algo} completed.`);
+  }
 };
 
 socket.onerror = (err) => {
