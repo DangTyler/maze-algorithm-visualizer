@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>Maze Visualizer</title>
   <style>
     body {
@@ -9,14 +9,39 @@
       background: #111;
       color: white;
       font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
     }
+
     #status {
-      padding: 1em;
+      padding: 0.5em;
+      background: #222;
+      border-bottom: 1px solid #333;
+    }
+
+    #viewports {
+      display: flex;
+      flex-direction: row;
+      width: 100vw;
+      height: calc(100vh - 2em);
+    }
+
+    canvas {
+      flex: 1;
+      display: block;
     }
   </style>
 </head>
 <body>
   <div id="status">⏳ Waiting for WebSocket connection...</div>
+  <div id="viewports"></div>
+
+  <!-- Websocket logic -->
   <script type="module" src="websocket-client.js"></script>
+
+  <!-- Load visualizer -->
+  <script type="module" src="script.js"></script>
+
+  
 </body>
 </html>
