@@ -1,71 +1,114 @@
-/*  frontend/script.js  */
-/*  =====================================================
-    Loads Three.js from jsDelivr (pre‑built ES‑module),
-    builds TWO viewports, and exposes visualizeVisit()
-    so websocket‑client.js can recolor cells live.
-   ===================================================== */
+const GRID = 320;
+const CELL = 2;      // screen pixels per logical cell
+const GAP  = 8;      // px between boards
 
-   import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.175.0/build/three.module.js';
+const BOARD_PX = GRID * CELL;
+const CANVAS_W = BOARD_PX * 2 + GAP;
+const CANVAS_H = BOARD_PX;
 
-   console.log('🚀 script.js loaded');
-   
-   const GRID  = 10;               // 10 × 10 grid
-   const CELL  = 1;
-   const cubes = {};               // map "x,y" → cube
-   
-   /* ------------------------------------------- */
-   /*  helper to create one viewport (left/right) */
-   /* ------------------------------------------- */
-   function addViewport(offsetX) {
-     const scene  = new THREE.Scene();
-   
-     // camera set so the whole grid is visible
-     const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-     camera.position.set(GRID / 2 + offsetX, GRID / 2, 30);
-     camera.lookAt(GRID / 2 + offsetX, GRID / 2, 0);
-   
-     const renderer = new THREE.WebGLRenderer();
-     renderer.setSize(window.innerWidth / 2, window.innerHeight - 32); // 32 px for status bar
-     renderer.setClearColor(offsetX === 0 ? 0x202020 : 0x303030);      // left darker / right lighter
-     document.getElementById('viewports').appendChild(renderer.domElement);
-   
-     /* --- build the flat grid of cubes --- */
-     for (let x = 0; x < GRID; x++) {
-       for (let y = 0; y < GRID; y++) {
-         const cube = new THREE.Mesh(
-           new THREE.BoxGeometry(CELL, CELL, 0.1),
-           new THREE.MeshBasicMaterial({ color: 0x444444 })             // default grey
-         );
-         cube.position.set(x + offsetX, y, 0);
-         scene.add(cube);
-         cubes[`${x + offsetX},${y}`] = cube;                           // store for live updates
-       }
-     }
-   
-     return { scene, camera, renderer };
-   }
-   
-   /* ---------- create LEFT (BFS) and RIGHT (DFS placeholder) ---------- */
-   const left  = addViewport(0);
-   const right = addViewport(15);
-   
-   /* ---------- simple perpetual draw loop ---------- */
-   (function animate() {
-     requestAnimationFrame(animate);
-     left .renderer.render(left .scene, left .camera);
-     right.renderer.render(right.scene, right.camera);
-   })();
-   
-   /* ---------- exposed API for websocket‑client.js ---------- */
-   window.visualizeVisit = (x, y) => {
-     const cube = cubes[`${x},${y}`];
-     if (cube) cube.material.color.set(0x00ffff);   // cyan for “visited”
-   };
-   
-   /* Optionally add this later for path coloring
-   window.visualizePath = (x, y) => {
-     const cube = cubes[`${x},${y}`];
-     if (cube) cube.material.color.set(0xffff00);   // yellow for final path
-   };
-   */
-   
+const COLOR_GREY  = 0x5a5a5a;
+const COLOR_VISIT = 0x00ffff;
+const COLOR_PATH  = 0xffff00;
+
+// create Pixi app (v7 legacy)
+const app = new PIXI.Application({
+  width:  CANVAS_W,
+  height: CANVAS_H,
+  background: 0x111111
+});
+document.getElementById('viewports').appendChild(app.view);
+
+// pack RRGGBB → ABGR little‑endian Uint32 for fromBuffer
+const toABGR = rgb =>
+  0xff000000
+  | ((rgb & 0x0000ff) << 16)
+  |  (rgb & 0x00ff00)
+  | ((rgb & 0xff0000) >>> 16);
+
+// makeBoard builds a pixel buffer + Graphics layer at offsetX
+function makeBoard(offsetX) {
+  const buf = new Uint32Array(GRID * GRID);
+  buf.fill(toABGR(COLOR_GREY));
+
+  const gfx = new PIXI.Graphics();
+  gfx.position.set(offsetX, 0);
+  app.stage.addChild(gfx);
+
+  function paint(x, y, rgb) {
+    if (x < 0 || y < 0 || x >= GRID || y >= GRID) return;
+    buf[y * GRID + x] = toABGR(rgb);
+  }
+
+  return { buf, gfx, paint };
+}
+
+const left  = makeBoard(0);
+const right = makeBoard(BOARD_PX + GAP);
+
+// each frame we rebuild the texture from the buffer
+app.ticker.add(() => {
+  let tex = PIXI.Texture.fromBuffer(new Uint8Array(left.buf.buffer), GRID, GRID);
+  left.gfx.clear()
+         .beginTextureFill({ texture: tex, matrix: new PIXI.Matrix(CELL,0,0,CELL) })
+         .drawRect(0, 0, BOARD_PX, BOARD_PX)
+         .endFill();
+
+  tex = PIXI.Texture.fromBuffer(new Uint8Array(right.buf.buffer), GRID, GRID);
+  right.gfx.clear()
+          .beginTextureFill({ texture: tex, matrix: new PIXI.Matrix(CELL,0,0,CELL) })
+          .drawRect(0, 0, BOARD_PX, BOARD_PX)
+          .endFill();
+});
+
+window.visualizeVisitLeft  = (x, y) => left.paint(x, y, COLOR_VISIT);
+window.visualizePathLeft   = (x, y) => left.paint(x, y, COLOR_PATH);
+window.visualizeVisitRight = (x, y) => right.paint(x, y, COLOR_VISIT);
+window.visualizePathRight  = (x, y) => right.paint(x, y, COLOR_PATH);
+
+// BFS: yield cells by Manhattan‑distance rings
+function* bfsSteps() {
+  for (let r = 0; r <= (GRID-1)*2; r++) {
+    for (let x = 0; x < GRID; x++)
+      for (let y = 0; y < GRID; y++)
+        if (Math.abs(x) + Math.abs(y) === r)
+          yield { x, y, type: 'visited' };
+  }
+  for (let i = 0; i < GRID; i++) yield { x:i, y:i, type: 'path' };
+}
+
+// DFS: diagonal first, then flood the rest
+function* dfsSteps() {
+  for (let i = 0; i < GRID; i++) yield { x:i, y:i, type: 'visited' };
+  for (let x = 0; x < GRID; x++)
+    for (let y = 0; y < GRID; y++)
+      if (x !== y) yield { x, y, type: 'visited' };
+  for (let i = 0; i < GRID; i++) yield { x:i, y:i, type: 'path' };
+}
+
+// syncDemo pulls one step from each generator per tick
+async function syncDemo() {
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  const bfsGen = bfsSteps(), dfsGen = dfsSteps();
+  let bfsNext = bfsGen.next(), dfsNext = dfsGen.next();
+
+  while (!bfsNext.done || !dfsNext.done) {
+    if (!bfsNext.done) {
+      const { x, y, type } = bfsNext.value;
+      (type === 'visited'
+        ? window.visualizeVisitLeft
+        : window.visualizePathLeft)(x, y);
+      bfsNext = bfsGen.next();
+    }
+    if (!dfsNext.done) {
+      const { x, y, type } = dfsNext.value;
+      (type === 'visited'
+        ? window.visualizeVisitRight
+        : window.visualizePathRight)(x, y);
+      dfsNext = dfsGen.next();
+    }
+    await delay(10); // yield so UI can update
+  }
+  console.log('🏁 Both complete');
+}
+
+syncDemo();
