@@ -57,11 +57,12 @@
    })();
    
    /* ---------- exposed API for websocket‑client.js ---------- */
-   window.visualizeVisit = (x, y) => {
-     const cube = cubes[`${x},${y}`];
-     if (cube) cube.material.color.set(0x00ffff);   // cyan for “visited”
-   };
-   
+     window.visualizeVisit = (x, y) => {
+          const key = `${x},${y}`;
+          const cube = cubes[key];
+          if (cube) {
+            cube.material.color.set(0x00ffff); // cyan for visited
+  };
    /* Optionally add this later for path coloring
    window.visualizePath = (x, y) => {
      const cube = cubes[`${x},${y}`];
