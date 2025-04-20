@@ -5,7 +5,7 @@ cd backend
 
 npm install
 
-# 2. Compile the algorithm
+# 2. Compile the algorithm (make sure to recompile every time you update the bfs cpp file!!)
 cd backend/algorithms
 
 g++ bfs.cpp -o bfs   
