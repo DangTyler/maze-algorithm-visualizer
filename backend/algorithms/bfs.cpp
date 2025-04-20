@@ -1,14 +1,168 @@
-#include <iostream>
-#include <thread>
-#include <chrono>
+#include <bits/stdc++.h>
+#include <vector>
+#include <cstdint>
+using namespace std;
 
-int main() {
-    for (int x = 0; x < 5; ++x) {
-        for (int y = 0; y < 5; ++y) {
-            std::cout << "{\"x\":" << x << ",\"y\":" << y << ",\"type\":\"visited\"}" << std::endl;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Simulate step-by-step
+const int N = 317;
+const int INF = INT_MAX;
+
+// 0 = passage, 1 = wall
+vector<vector<int>> maze(N, vector<int>(N, 1));
+
+// Distance and parent arrays for BFS and Dijkstra
+vector<vector<int>> dist0(N, vector<int>(N, INF));
+vector<vector<int>> distD(N, vector<int>(N, INF));
+vector<vector<pair<int,int>>> parent0(N, vector<pair<int,int>>(N, {-1,-1}));
+vector<vector<pair<int,int>>> parentD(N, vector<pair<int,int>>(N, {-1,-1}));
+
+// 4-directional movement
+vector<pair<int,int>> dirs = {{1,0},{-1,0},{0,1},{0,-1}};
+
+void generateMaze() {
+    if (N % 2 == 0) {
+        cerr << "N must be odd\n";
+        exit(1);
+    }
+
+    // Fill entire grid with walls
+    for (int i = 0; i < N; ++i)
+        for (int j = 0; j < N; ++j)
+            maze[i][j] = 1;
+
+    std::mt19937_64 rng((unsigned)time(nullptr));
+
+    // Recursive backtracking to carve paths
+    function<void(int,int)> carve = [&](int cx, int cy) {
+        maze[cx][cy] = 0;
+
+        array<pair<int,int>,4> nbrs = {{
+            {cx + 2, cy},
+            {cx - 2, cy},
+            {cx, cy + 2},
+            {cx, cy - 2}
+        }};
+        shuffle(nbrs.begin(), nbrs.end(), rng);
+
+        for (auto [nx, ny] : nbrs) {
+            if (nx > 0 && nx < N-1 && ny > 0 && ny < N-1 && maze[nx][ny] == 1) {
+                int wx = (cx + nx) / 2;
+                int wy = (cy + ny) / 2;
+                maze[wx][wy] = 0;
+                carve(nx, ny);
+            }
+        }
+    };
+
+    carve(1, 1);
+
+    // Create an exit
+    maze[N-2][N-1] = 0;
+}
+
+void zeroOneBFS() {
+    deque<pair<int,int>> dq;
+    dist0[0][0] = maze[0][0];
+    parent0[0][0] = {0,0};
+    dq.emplace_back(0,0);
+
+    while (!dq.empty()) {
+        auto [x,y] = dq.front(); dq.pop_front();
+        for (auto &d : dirs) {
+            int nx = x + d.first, ny = y + d.second;
+            if (nx<0||nx>=N||ny<0||ny>=N) continue;
+            int w = maze[nx][ny];
+            int nd = dist0[x][y] + w;
+            if (nd < dist0[nx][ny]) {
+                dist0[nx][ny] = nd;
+                parent0[nx][ny] = {x,y};
+                cout << "{\"algo\":\"BFS\",\"type\":\"visited\",\"x\":"<<nx
+                     <<",\"y\":"<<ny<<"}" << endl;
+                if (w==0) dq.emplace_front(nx,ny);
+                else      dq.emplace_back (nx,ny);
+            }
         }
     }
-    std::cout << "{\"type\":\"done\"}" << std::endl;
+
+    // Reconstruct path
+    vector<pair<int,int>> path;
+    int x = N-1, y = N-1;
+    if (parent0[x][y].first != -1) {
+        while (!(x==0 && y==0)) {
+            path.emplace_back(x,y);
+            tie(x,y) = parent0[x][y];
+        }
+        path.emplace_back(0,0);
+        reverse(path.begin(), path.end());
+    }
+    for (auto &p : path) {
+        cout << "{\"algo\":\"BFS\",\"type\":\"path\",\"x\":"<<p.first
+             <<",\"y\":"<<p.second<<"}" << endl;
+    }
+
+    int steps = max(0, (int)path.size() - 1);
+    cout << "{\"algo\":\"BFS\",\"type\":\"steps\",\"count\":" << steps << "}" << endl;
+    cout << "{\"algo\":\"BFS\",\"type\":\"done\"}" << endl;
+}
+
+void dijkstra() {
+    using T = tuple<int,int,int>;
+    priority_queue<T, vector<T>, greater<T>> pq;
+    distD[0][0] = maze[0][0];
+    parentD[0][0] = {0,0};
+    pq.emplace(distD[0][0], 0, 0);
+
+    while (!pq.empty()) {
+        auto [d,x,y] = pq.top(); pq.pop();
+        if (d > distD[x][y]) continue;
+        for (auto &dir : dirs) {
+            int nx = x + dir.first, ny = y + dir.second;
+            if (nx<0||nx>=N||ny<0||ny>=N) continue;
+            int nd = d + maze[nx][ny];
+            if (nd < distD[nx][ny]) {
+                distD[nx][ny] = nd;
+                parentD[nx][ny] = {x,y};
+                cout << "{\"algo\":\"Dijkstra\",\"type\":\"visited\",\"x\":"<<nx
+                     <<",\"y\":"<<ny<<"}" << endl;
+                pq.emplace(nd, nx, ny);
+            }
+        }
+    }
+
+    // Reconstruct path
+    vector<pair<int,int>> path;
+    int x = N-1, y = N-1;
+    if (parentD[x][y].first != -1) {
+        while (!(x==0 && y==0)) {
+            path.emplace_back(x,y);
+            tie(x,y) = parentD[x][y];
+        }
+        path.emplace_back(0,0);
+        reverse(path.begin(), path.end());
+    }
+    for (auto &p : path) {
+        cout << "{\"algo\":\"Dijkstra\",\"type\":\"path\",\"x\":"<<p.first
+             <<",\"y\":"<<p.second<<"}" << endl;
+    }
+
+    int steps = max(0, (int)path.size() - 1);
+    cout << "{\"algo\":\"Dijkstra\",\"type\":\"steps\",\"count\":" << steps << "}" << endl;
+    cout << "{\"algo\":\"Dijkstra\",\"type\":\"done\"}" << endl;
+}
+
+int main() {
+    generateMaze();
+    zeroOneBFS();
+    dijkstra();
+
+    // Output all wall cells
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            if (maze[i][j] == 1) {
+                cout << "{\"type\":\"wall\",\"x\":" << i
+                     << ",\"y\":" << j << "}" << endl;
+            }
+        }
+    }
+
     return 0;
 }

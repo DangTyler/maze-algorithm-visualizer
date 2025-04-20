@@ -1,41 +1,40 @@
 // backend/server.js
 const WebSocket = require('ws');
 const { spawn } = require('child_process');
-const path = require('path');
+const path      = require('path');
 
-const wss = new WebSocket.Server({ port: 8080 }, () => {
-  console.log('✅ WebSocket server started on ws://localhost:8080');
-});
+const wss = new WebSocket.Server({ 
+  port: 8080,
+  maxPayload: 10 * 1024 * 1024,
+}, () =>
+  console.log('✅ WebSocket server on ws://localhost:8080')
+);
 
 wss.on('connection', (ws) => {
   console.log('🌐 Client connected');
 
-  const isWindows = process.platform === 'win32';
-  const algoPath = isWindows
-    ? path.join(__dirname, 'algorithms', 'bfs.exe')
-    : path.join(__dirname, 'algorithms', 'bfs');
+  // run the search algorithm (compiled binary)
+  const bin = path.join(__dirname, 'algorithms', 'bfs');
+  const algo = spawn(bin);
 
-  const algo = spawn(algoPath);
-
-  algo.stdout.on('data', (data) => {
-    const lines = data.toString().split('\n').filter(Boolean);
-    lines.forEach((line) => {
-      console.log('📤 Sending to client:', line);
-      ws.send(line);
-    });
+  // pipe stdout lines to frontend
+  algo.stdout.on('data', (chunk) => {
+    chunk.toString()
+      .split('\n')
+      .filter(Boolean)
+      .forEach(line => ws.send(line));
   });
 
+  // log errors if algorithm fails
   algo.stderr.on('data', (err) => {
-    console.error('⚠️ Error from C++:', err.toString());
+    console.error('⚠️ Algorithm error:', err.toString());
   });
 
+  // notify when algorithm exits
   algo.on('close', (code) => {
-    console.log(`🚪 C++ process exited with code ${code}`);
-    ws.send(JSON.stringify({ type: 'done' }));
+    console.log(`🔚 Algorithm process exited (${code})`);
   });
 
-  ws.on('close', () => {
-    console.log('🔌 Client disconnected');
-    algo.kill();
-  });
+  // kill process if client closes early
+  ws.on('close', () => algo.kill());
 });

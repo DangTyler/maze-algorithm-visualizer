@@ -23,25 +23,58 @@
       display: flex;
       flex-direction: row;
       width: 100vw;
-      height: calc(100vh - 2em);
+      height: calc(100vh - 4em);
+    }
+
+    .viewport-wrapper {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     canvas {
       flex: 1;
       display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #steps {
+      display: flex;
+      background: #222;
+      border-top: 1px solid #333;
+      padding: 0.5em 0;
+    }
+
+    #steps .step-counter {
+      flex: 1;
+      text-align: center;
+      font-size: 0.9em;
     }
   </style>
 </head>
 <body>
   <div id="status">⏳ Waiting for WebSocket connection...</div>
-  <div id="viewports"></div>
+  <button id="generateBtn" style="margin:0.5em;">Generate Maze</button>
+
+  <div id="viewports">
+    <!-- script.js appends canvas here -->
+  </div>
+
+  <div id="steps">
+    <div class="step-counter">
+      BFS Steps: <span id="bfsSteps">0</span>
+    </div>
+    <div class="step-counter">
+      Dijkstra Steps: <span id="dijkstraSteps">0</span>
+    </div>
+  </div>
 
   <!-- Load PIXI -->
   <script src="https://cdn.jsdelivr.net/npm/pixi.js-legacy@7/dist/pixi-legacy.min.js"></script>
-
-   <!-- Load visualizer -->
-   <script type="module" src="script.js"></script>
-
+  <!-- Load visualizer -->
+  <script type="module" src="script.js"></script>
   <!-- Websocket logic -->
   <script type="module" src="websocket-client.js"></script>
 </body>
