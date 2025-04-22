@@ -46,17 +46,23 @@ wss.on("connection", (ws) => {
 
       // log errors if algorithm fails
       algo.stderr.on("data", (err) => {
-        console.error("⚠️ Algorithm error:", err.toString());
+        console.error("Algorithm error:", err.toString());
       });
 
       // notify when algorithm exits
       algo.on("close", (code) => {
-        console.log(`🔚 Algorithm process exited (${code})`);
+        console.log(`Algorithm process exited (${code})`);
         algo = null;
       });
     }
   });
 
   // kill process if client closes early
-  ws.on("close", () => algo.kill());
+  ws.on("close", () => {
+    console.log("Client disconnected");
+    if (algo) {
+      algo.kill();
+      algo = null;
+    }
+  });
 });
