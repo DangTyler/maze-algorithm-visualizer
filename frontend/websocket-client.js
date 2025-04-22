@@ -102,3 +102,39 @@ socket.onclose = () => {
   console.log('🔌 WebSocket disconnected');
   status.textContent = '🔌 Disconnected from WebSocket';
 };
+// Function to reset the maze visuals and step counters
+function resetMazeAndCounters() {
+  // Reset step counters
+  bfsCounter.textContent = '0';
+  dijkstraCounter.textContent = '0';
+  // Clear visualizations if we have a way to do so
+  if (typeof window.clearMaze === 'function') {
+    window.clearMaze();
+  } else {
+    // If no clearMaze function exists, reset the boards using existing functions
+    for (let x = 0; x < GRID; x++) {
+      for (let y = 0; y < GRID; y++) {
+        // Reset to default color
+        if (window.visualizeVisitLeft) window.visualizeVisitLeft(x, y, COLOR_GREY);
+        if (window.visualizeVisitRight) window.visualizeVisitRight(x, y, COLOR_GREY);
+      }
+    }
+  }
+}
+// Add event listener to the Generate Maze button
+generateBtn.addEventListener('click', () => {
+  if (socket.readyState === WebSocket.OPEN) {
+    console.log('🔄 Requesting new maze generation');
+    status.textContent = '⏳ Generating maze...';
+    // Send a request to generate a new maze
+    socket.send(JSON.stringify({ 
+      action: 'generate'
+    }));
+    // Reset counters immediately on button click
+    bfsCounter.textContent = '0';
+    dijkstraCounter.textContent = '0';
+  } else {
+    console.warn('⚠️ WebSocket not connected');
+    status.textContent = '❌ Cannot generate maze: WebSocket not connected';
+  }
+});
