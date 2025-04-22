@@ -29,31 +29,43 @@ void generateMaze() {
         for (int j = 0; j < N; ++j)
             maze[i][j] = 1;
 
-    std::mt19937_64 rng((unsigned)time(nullptr));
+    mt19937_64 rng((unsigned)time(nullptr));
 
-    // Recursive backtracking to carve paths
-    function<void(int,int)> carve = [&](int cx, int cy) {
-        maze[cx][cy] = 0;
+    // Iterative carve (MUST HAVE, recursive causes stack overflow)
+    stack<pair<int,int>> st;
+    st.push({1, 1});
+    maze[1][1] = 0;
 
-        array<pair<int,int>,4> nbrs = {{
+    while (!st.empty()) {
+        auto [cx, cy] = st.top();
+
+        // get neighbors
+        array<pair<int,int>,4> cand = {{
             {cx + 2, cy},
             {cx - 2, cy},
             {cx, cy + 2},
             {cx, cy - 2}
         }};
-        shuffle(nbrs.begin(), nbrs.end(), rng);
-
-        for (auto [nx, ny] : nbrs) {
+        vector<pair<int,int>> nbrs;
+        for (auto &p : cand) {
+            auto [nx, ny] = p;
             if (nx > 0 && nx < N-1 && ny > 0 && ny < N-1 && maze[nx][ny] == 1) {
-                int wx = (cx + nx) / 2;
-                int wy = (cy + ny) / 2;
-                maze[wx][wy] = 0;
-                carve(nx, ny);
+                nbrs.push_back(p);
             }
         }
-    };
 
-    carve(1, 1);
+        if (!nbrs.empty()) {
+            auto [nx, ny] = nbrs[rng() % nbrs.size()];
+        
+            maze[(cx + nx) / 2][(cy + ny) / 2] = 0;
+            maze[nx][ny] = 0;
+          
+            st.push({nx, ny});
+        } else {
+            // backtrack
+            st.pop();
+        }
+    }
 
     // Create an exit
     maze[N-2][N-1] = 0;

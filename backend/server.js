@@ -62,7 +62,6 @@ wss.on("connection", (ws) => {
     console.log("Client disconnected");
     if (algo) {
       algo.kill();
-      algo = null;
     }
   });
 });
