@@ -75,3 +75,19 @@ window.visualizeVisitRight = (x, y) => right.paint(x, y, COLOR_VISIT);
 window.visualizePathRight  = (x, y) => right.paint(x, y, COLOR_PATH);
 window.visualizeWallLeft   = (x, y) => left.paint(x, y, 0x000000);
 window.visualizeWallRight  = (x, y) => right.paint(x, y, 0x000000);
+
+// Add a function to clear the maze
+window.clearMaze = () => {
+  // Reset both boards to default color
+  for (let x = 0; x < GRID; x++) {
+    for (let y = 0; y < GRID; y++) {
+      left.paint(x, y, COLOR_GREY);
+      right.paint(x, y, COLOR_GREY);
+    }
+  }
+  console.log('🧹 Cleared maze visualization');
+};
+
+// Expose global constants for use in other scripts
+window.GRID = GRID;
+window.COLOR_GREY = COLOR_GREY;
